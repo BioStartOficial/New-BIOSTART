@@ -64,10 +64,20 @@ app.post("/login", async (req, res) => {
     return res.status(400).send({ error: "Por favor, insira o email e a senha." });
   }
   try {
+    // Adicionado logs detalhados para depuração da chamada Airtable no login
+    console.log("Tentando login para email:", email);
+    const airtableLoginUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores?filterByFormula=AND({Email}='${email}',{Senha (Hash)}='${password}')&maxRecords=1`;
+    console.log("Chamando Airtable URL para login:", airtableLoginUrl);
+    console.log("Com Headers para login:", getAirtableHeaders());
+
     const response = await axios.get(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores?filterByFormula=AND({Email}='${email}',{Senha (Hash)}='${password}')&maxRecords=1`,
+      airtableLoginUrl,
       { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
+
+    console.log("Resposta do Airtable (status) para login:", response.status);
+    console.log("Resposta do Airtable (data) para login:", response.data);
+
     if (response.data.records.length > 0) {
       const userRecord = response.data.records[0];
       const completedIds = JSON.parse(userRecord.fields.CompletedContentIDs || '[]');
@@ -76,7 +86,9 @@ app.post("/login", async (req, res) => {
       res.status(401).send({ error: "Email ou senha incorretos." });
     }
   } catch (err) {
-    console.error("Backend: Erro no login de utilizador:", err.response?.data || err.message);
+    console.error("Backend: Erro DETALHADO no login de utilizador:", err); // Loga o objeto 'err' completo
+    console.error("Mensagem do erro:", err.message);
+    console.error("Dados da resposta do erro (se houver):", err.response?.data);
     res.status(500).send({ error: "Erro ao fazer login", details: err.response?.data || err.message });
   }
 });
@@ -142,8 +154,8 @@ const getContent = async (res, tableName, fieldMapping) => {
 
 app.get("/content/educational-texts", (req, res) => getContent(res, 'Conteudo Educativo', record => ({
   id: record.id,
-  title: record.fields.titulo,  
-  content: record.fields.conteudo,  
+  title: record.fields.titulo,
+  content: record.fields.conteudo,
   text: record.fields.conteudo,
   annexUrl: record.fields.imageUrl || null,
   image: record.fields.imageUrl || null,
@@ -319,8 +331,8 @@ const callGeminiAPI = async (prompt) => {
     if (!GEMINI_API_KEY) {
         throw new Error("A chave da API do Gemini não está configurada no servidor.");
     }
-    // Alterado o modelo para gemini-pro para maior compatibilidade
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    // Alterado o modelo para gemini-1.0-pro para maior compatibilidade
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${GEMINI_API_KEY}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
     const response = await axios.post(API_URL, payload, { headers: { 'Content-Type': 'application/json' } });
     if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
