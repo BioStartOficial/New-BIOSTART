@@ -24,6 +24,14 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'Server is running', message: 'Hello from BioStart Backend!' });
 });
 
+// --- Função auxiliar para cabeçalhos Airtable ---
+// Esta função centraliza os cabeçalhos necessários para todas as requisições Airtable.
+const getAirtableHeaders = () => ({
+  Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+});
+
 // --- ROTAS DE AUTENTICAÇÃO (Utilizador e Admin) ---
 app.post("/registro", async (req, res) => {
   const { name, email, password, age, regionCity, profession, renewableEnergyExperience, acceptTerms } = req.body;
@@ -33,7 +41,7 @@ app.post("/registro", async (req, res) => {
   try {
     const existingUsers = await axios.get(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores?filterByFormula={Email}='${email}'&maxRecords=1`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     if (existingUsers.data.records.length > 0) {
       return res.status(409).send({ error: "Este email já está registado." });
@@ -41,7 +49,7 @@ app.post("/registro", async (req, res) => {
     const response = await axios.post(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores`,
       { fields: { "Nome Completo": name, Email: email, "Senha (Hash)": password, Idade: parseInt(age), "Região/Cidade": regionCity, "Profissão/Ocupação": profession, "Experiência Energia Renovável": renewableEnergyExperience, "Aceita Termos": acceptTerms, CompletedContentIDs: "[]" } },
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     res.status(200).send({ success: true, recordId: response.data.id });
   } catch (err) {
@@ -58,7 +66,7 @@ app.post("/login", async (req, res) => {
   try {
     const response = await axios.get(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores?filterByFormula=AND({Email}='${email}',{Senha (Hash)}='${password}')&maxRecords=1`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     if (response.data.records.length > 0) {
       const userRecord = response.data.records[0];
@@ -81,7 +89,7 @@ app.post("/admin-registro", async (req, res) => {
     try {
         const existingAdmins = await axios.get(
             `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Administradores?filterByFormula={Email}='${email}'&maxRecords=1`,
-            { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+            { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         if (existingAdmins.data.records.length > 0) {
             return res.status(409).send({ error: "Este email de administrador já está registado." });
@@ -89,7 +97,7 @@ app.post("/admin-registro", async (req, res) => {
         const response = await axios.post(
             `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Administradores`,
             { fields: { "Nome do Admin": name, "Email": email, "Senha (Hash)": password } },
-            { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+            { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         res.status(200).send({ success: true, recordId: response.data.id });
     } catch (err) {
@@ -104,7 +112,7 @@ app.post("/admin-login", async (req, res) => {
     try {
         const response = await axios.get(
         `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Administradores?filterByFormula=AND({Email}='${email}',{Senha (Hash)}='${password}')&maxRecords=1`,
-        { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+        { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         if (response.data.records.length > 0) {
         const adminRecord = response.data.records[0];
@@ -122,11 +130,12 @@ const getContent = async (res, tableName, fieldMapping) => {
   try {
     const response = await axios.get(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     const data = response.data.records.map(record => fieldMapping(record));
     res.status(200).json({ success: true, data });
   } catch (error) {
+    console.error(`Erro ao obter dados de ${tableName}:`, error.response?.data || error.message); // Adicionado log de erro
     res.status(500).json({ success: false, error: `Erro ao obter dados de ${tableName}.` });
   }
 };
@@ -169,7 +178,7 @@ const postToAirtable = async (res, tableName, fieldsToPost) => {
     const response = await axios.post(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}`,
       { fields: fieldsToPost },
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     res.status(200).send({ success: true, recordId: response.data.id });
   } catch (error) {
@@ -215,10 +224,11 @@ const patchContent = async (res, tableName, id, fieldsToUpdate) => {
     const response = await axios.patch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}/${id}`,
       { fields: fieldsToUpdate },
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     res.status(200).send({ success: true, data: response.data.fields });
   } catch (error) {
+    console.error(`Erro ao atualizar em ${tableName}:`, error.response?.data || error.message);
     res.status(500).send({ error: `Erro ao atualizar em ${tableName}.`, details: error.response?.data || error.message });
   }
 };
@@ -257,10 +267,11 @@ const deleteRecord = async (tableName, id, res) => {
   try {
     await axios.delete(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}/${id}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+      { headers: getAirtableHeaders() } // Usando a função auxiliar
     );
     res.status(200).send({ success: true });
   } catch (error) {
+    console.error(`Erro ao excluir em ${tableName}:`, error.response?.data || error.message); // Adicionado log de erro
     res.status(500).send({ error: "Erro ao excluir." });
   }
 };
@@ -275,7 +286,7 @@ app.get("/user/:userId/checklist", async (req, res) => {
     try {
         const response = await axios.get(
             `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores/${userId}`,
-            { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } }
+            { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         const checklistState = response.data.fields.checklistStateJSON || '{}';
         res.status(200).json({ success: true, checklistState: JSON.parse(checklistState) });
@@ -292,7 +303,7 @@ app.post("/user/:userId/checklist", async (req, res) => {
         await axios.patch(
             `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Utilizadores/${userId}`,
             { fields: { "checklistStateJSON": JSON.stringify(checklistState), "checklistProgress": progress } },
-            { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" } }
+            { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         res.status(200).json({ success: true, message: "Progresso do checklist guardado." });
     } catch (error) {
@@ -307,7 +318,8 @@ const callGeminiAPI = async (prompt) => {
     if (!GEMINI_API_KEY) {
         throw new Error("A chave da API do Gemini não está configurada no servidor.");
     }
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    // Alterado o modelo para gemini-pro para maior compatibilidade
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
     const response = await axios.post(API_URL, payload, { headers: { 'Content-Type': 'application/json' } });
     if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
