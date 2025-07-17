@@ -306,7 +306,8 @@ app.post("/user/:userId/checklist", async (req, res) => {
             { headers: getAirtableHeaders() } // Usando a função auxiliar
         );
         res.status(200).json({ success: true, message: "Progresso do checklist guardado." });
-    } catch (error) {
+    }
+    catch (error) {
         console.error("Erro ao guardar estado do checklist:", error.response?.data || error.message);
         res.status(500).json({ success: false, error: "Erro ao guardar progresso do checklist." });
     }
